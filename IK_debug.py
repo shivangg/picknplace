@@ -157,8 +157,6 @@ def test_code(test_case):
 
     T0_G = T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_G 
 
-    
-
     # Rotation matrices for rotations along x, y and z axis
     #
 
@@ -180,12 +178,14 @@ def test_code(test_case):
     # symbol for rotation of according to given roll, pitch and yaw.
 
     # correcting gripper orientation
+
     R_corr = Rz.subs(y, radians(180) ) * Ry.subs(p, radians(-90) )
-    
 
     # R_EE = R_EE * R_corr
 
-    R_EE = Rz * Ry * Rx * R_corr
+    R_EE = simplify(Rz * Ry * Rx * R_corr)
+
+    print("R_EE", R_EE )
 
     # print("T0_1 = ", T0_1.evalf(subs={ q1: 0, q2: 0, q3:0, q4: 0, q5: 0, q6:0 } ))
     # print("T0_2 = ", T0_2.evalf(subs={ q1: 0, q2: 0, q3:0, q4: 0, q5: 0, q6:0 } ))
@@ -199,10 +199,11 @@ def test_code(test_case):
     # Extract rotation matrices from the transformation matrices
     #
     # extracting the rotation matrix and multiplying for rotaion matrix for joint 1 to joint 3
-    R0_3 = T0_1[0:3, 0:3] * T1_2[0:3, 0:3] * T2_3[0:3, 0:3]
+    R0_3 = simplify(T0_1[0:3, 0:3] * T1_2[0:3, 0:3] * T2_3[0:3, 0:3])
 
-    #T0_3 = T0_1 * T1_2 * T2_3
-    #R0_3 = T0_3[0:3, 0:3]
+    print("R0_3" ,R0_3)
+    # T0_3 = T0_1 * T1_2 * T2_3
+    # R0_3 = T0_3[0:3, 0:3]
 
     #
     ###
@@ -227,7 +228,9 @@ def test_code(test_case):
         [req.poses[x].orientation.x, req.poses[x].orientation.y,
             req.poses[x].orientation.z, req.poses[x].orientation.w])
 
-    R_EE = R_EE.subs({ r: roll, p: pitch, y: yaw })
+
+    R_EE_num = R_EE.subs({ r: roll, p: pitch, y: yaw })
+
     # print("rpy")
     # print(roll, pitch, yaw)
 
@@ -238,8 +241,8 @@ def test_code(test_case):
                 [pz]
         ])
 
-    WC = EE - (0.303) * R_EE[:, 2]
-    #WC = EE - (0.303) * R_EE * Matrix([[0],[0],[1]])
+
+    WC = EE - (0.303) * R_EE_num[:, 2]
     # print(WC)
     # Calculate joint angles using Geometric IK method
     #
@@ -248,7 +251,7 @@ def test_code(test_case):
 
     side_a = 1.501
     side_b = sqrt(pow((sqrt(WC[0] * WC[0] + WC[1] * WC[1]) - 0.35 ), 2 )  + pow((WC[2] - 0.75), 2 ))
-    #print(side_b)
+
     side_c = 1.25
 
     angle_a = acos((side_c * side_c + side_b * side_b - side_a * side_a ) / (2 * side_b * side_c))
@@ -258,29 +261,31 @@ def test_code(test_case):
     theta2 = np.pi / 2 - angle_a - atan2(WC[2] - 0.75, sqrt(WC[0] * WC[0] + WC[1] * WC[1]) - 0.35)
     theta3 = np.pi / 2 - (angle_b + 0.036)
 
-
     print("theta1", theta1)
     print("theta2", theta2)
     print("theta3", theta3)
+
 
     # print("theta123")
     # print(theta1, theta2, theta3)
     #print("now calculating R0_3")
     
-    R0_3 = R0_3.evalf(subs={q1: theta1, q2: theta2, q3: theta3})
+
+    R0_3_num = R0_3.evalf(subs={q1: theta1, q2: theta2, q3: theta3})
 
     #print(R0_3)
 
     # print("R0_3")
     # print(R0_3)
 
-    R3_6 = R0_3.transpose() * R_EE
+    R3_6 = R0_3_num.transpose() * R_EE_num
+    R3_6_without_subs = R0_3.transpose() * R_EE_num
 
-    # print("R3_6")
-    # print(R3_6)
+    print("R3_6_without_subs")
+    print(R3_6_without_subs)
 
     theta4 = atan2(R3_6[2,2], -R3_6[0,2])
-    theta5 = atan2(sqrt(R3_6[0,2] * R3_6[0, 2] + R3_6[2,2] * R3_6[2,2]), R3_6[1,2])
+    theta5 = atan2( sqrt( R3_6[0,2] ** 2 + R3_6[2,2] ** 2 ), R3_6[1,2])
     theta6 = atan2(-R3_6[1,1], R3_6[1,0])
 
     # print("theta456")
@@ -313,7 +318,7 @@ def test_code(test_case):
     ########################################################################################
 
     ## Error analysis
-    print ("\nTotal run time to calculate joint angles from pose is %04.4f seconds" % (time()-start_time))
+    # print ("\nTotal run time to calculate joint angles from pose is %04.4f seconds" % (time()-start_time))
 
     # Find WC error
     if not(sum(your_wc)==3):
@@ -321,10 +326,10 @@ def test_code(test_case):
         wc_y_e = abs(your_wc[1]-test_case[1][1])
         wc_z_e = abs(your_wc[2]-test_case[1][2])
         wc_offset = sqrt(wc_x_e**2 + wc_y_e**2 + wc_z_e**2)
-        print ("\nWrist error for x position is: %04.8f" % wc_x_e)
-        print ("Wrist error for y position is: %04.8f" % wc_y_e)
-        print ("Wrist error for z position is: %04.8f" % wc_z_e)
-        print ("Overall wrist offset is: %04.8f units" % wc_offset)
+        # print ("\nWrist error for x position is: %04.8f" % wc_x_e)
+        # print ("Wrist error for y position is: %04.8f" % wc_y_e)
+        # print ("Wrist error for z position is: %04.8f" % wc_z_e)
+        # print ("Overall wrist offset is: %04.8f units" % wc_offset)
 
     # Find theta errors
     t_1_e = abs(theta1-test_case[2][0])
@@ -333,15 +338,15 @@ def test_code(test_case):
     t_4_e = abs(theta4-test_case[2][3])
     t_5_e = abs(theta5-test_case[2][4])
     t_6_e = abs(theta6-test_case[2][5])
-    print ("\nTheta 1 error is: %04.8f" % t_1_e)
-    print ("Theta 2 error is: %04.8f" % t_2_e)
-    print ("Theta 3 error is: %04.8f" % t_3_e)
-    print ("Theta 4 error is: %04.8f" % t_4_e)
-    print ("Theta 5 error is: %04.8f" % t_5_e)
-    print ("Theta 6 error is: %04.8f" % t_6_e)
-    print ("\n**These theta errors may not be a correct representation of your code, due to the fact \
-           \nthat the arm can have muliple positions. It is best to add your forward kinmeatics to \
-           \nconfirm whether your code is working or not**")
+    # print ("\nTheta 1 error is: %04.8f" % t_1_e)
+    # print ("Theta 2 error is: %04.8f" % t_2_e)
+    # print ("Theta 3 error is: %04.8f" % t_3_e)
+    # print ("Theta 4 error is: %04.8f" % t_4_e)
+    # print ("Theta 5 error is: %04.8f" % t_5_e)
+    # print ("Theta 6 error is: %04.8f" % t_6_e)
+    # print ("\n**These theta errors may not be a correct representation of your code, due to the fact \
+    #        \nthat the arm can have muliple positions. It is best to add your forward kinmeatics to \
+    #        \nconfirm whether your code is working or not**")
     # print (" ")
 
     # Find FK EE error
@@ -350,17 +355,16 @@ def test_code(test_case):
         ee_y_e = abs(your_ee[1]-test_case[0][0][1])
         ee_z_e = abs(your_ee[2]-test_case[0][0][2])
         ee_offset = sqrt(ee_x_e**2 + ee_y_e**2 + ee_z_e**2)
-        print ("\nEnd effector error for x position is: %04.8f" % ee_x_e)
-        print ("End effector error for y position is: %04.8f" % ee_y_e)
-        print ("End effector error for z position is: %04.8f" % ee_z_e)
-        print ("Overall end effector offset is: %04.8f units \n" % ee_offset)
+        # print ("\nEnd effector error for x position is: %04.8f" % ee_x_e)
+        # print ("End effector error for y position is: %04.8f" % ee_y_e)
+        # print ("End effector error for z position is: %04.8f" % ee_z_e)
+        # print ("Overall end effector offset is: %04.8f units \n" % ee_offset)
 
 
 
 
 if __name__ == "__main__":
     # Change test case number for different scenarios
-    test_case_number = 4
-
+    test_case_number = 3
     test_code(test_cases[test_case_number])
 

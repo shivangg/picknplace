@@ -194,7 +194,7 @@ def handle_calculate_IK(req):
 
             # TODO: make all angles Zero in RViz in joint_state_publiished and see the robot pose.
             
-            # angle offset because joint 3 and 4,5,6 are fixed in different at different height values.
+            # angle offset because joint 3 and 4,5,6 are not collinear.
 
             # offset_angle =  atan2( 0.054 , 1.5 ) == 0.036 radians
             theta3 = np.pi / 2 - (angle_b + 0.036)
