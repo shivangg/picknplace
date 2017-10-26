@@ -4,12 +4,26 @@
 
 Here is the [YouTube video](https://youtu.be/yYx3GbzMq0A) showing the pick and plcace operation using the *KR210 robotic arm*
 
-Used the kr210.xacro.urdf file to evaluate the D-H parameters. 
 
 ![The joints with gripper ][frame]
 
+##### The diagrammatic representation of the joints in the KR210 at the initial state
 
-The D-H Parameter Table 
+Following steps need to be followed to successfully find the IK solution of the robotic arm.
+
+### 1. Find a1, a2, a3, d4, dg
+
+![measurement figure][measure]
+
+####Joints of KR210
+
+Find the 3D coordinates of the six joints and the gripper using the `kr210.urdf.xacro` file. The XYZ reading are relative to the parent link so we take the cumulative sum of the readings.
+
+### 2. Make a python dictionary of known D-H parameters `s`.
+
+#### The D-H Parameter Table 
+
+To calculate the `DH parameters` of the KUKA kR210 the URDF file `kr210.xacro.urdf` was used.
 
 Link(i)  |	alpha( i-1 ) 	|	a( i-1 )  |	 d( i-1 )  |  theta( i )
 ---		 |	---				|	---	      |	 ---       |  ---	
@@ -21,23 +35,108 @@ Link(i)  |	alpha( i-1 ) 	|	a( i-1 )  |	 d( i-1 )  |  theta( i )
 6		|	-pi/2			|	0 	 		|     0    	   |   q6
 G		|	0				|	0 	 		|     0.303    |   0
 
+Storing these parameters as dictionary in python.
+```python
+s = {
+                alpha0: 0       , a0: 0     , d1: 0.75,    
+                alpha1: -pi/2.   , a1: 0.35  , d2: 0. ,  q2: q2 - pi/2.,  
+                alpha2: 0.       , a2: 1.25  , d3: 0. ,    
+                alpha3: -pi/2.   , a3: -0.054, d4: 1.5,    
+                alpha4: pi/2.    , a4: 0.     , d5: 0.,    
+                alpha5: -pi/2.   , a5: 0.     , d6: 0.,    
+                alpha6: 0.       , a6: 0.     , d7: 0.303 , q7: 0.   
+        }
+```
 
-![measurement figure][measure]
+### 3. Compose the homogeneous transform matrices using the D-H parameters
+To compose the matrix using the `DH parameters` for calculating the transform from `frame 0` to `frame i`(_for i = 1,2,3,4,5,6,G_), let us first define transformation matrices for elementary operations.
+
+```python
+Tx = Matrix([[      1,            0,                  0  ,    x_d  ],
+              [     0,       cos(x_angle),  -sin(x_angle),    0    ],
+              [     0,       sin(x_angle),   cos(x_angle),    0    ],
+              [     0,            0,                    0,    1    ]                 
+    ])
+
+Ty = Matrix([[ cos(y_angle)  ,        0,     sin(y_angle),     0    ],
+              [             0,        1,                0,     y_d  ],
+              [ -sin(y_angle),        0,     cos(y_angle),     0    ],
+              [             0,        0,                0,     1    ]
+    ])
+
+Tz = Matrix([[ cos(z_angle) ,        -sin(z_angle) ,     0,     0   ],
+              [ sin(z_angle),         cos(z_angle) ,     0,     0   ],
+              [            0,                    0 ,     1,     z_d ],
+              [            0,                    0 ,     0,     1   ]
+    ])
+```
+![Tx Ty Tz][Txyz]
+#### Transformation Matrix for the 3 orthogonal axes
+
+where `x_angle`, `y_angle`, `z_angle` are rotations about `x`, `y` and `z` axes and
+`x_d` , `y_d` and `z_d` are translations along the `x`, `y` and `z` axes.
 
 
-### Find a1, a2, a3, d4, dg
 
-1. First find the 3D coordinates of the six joints and the gripper using the `kr210.urdf.xacro` file. The XYZ reading are relative to the parent link so we take the cumulative sum of the readings.
+##### To find this homogeneous transform from `frame (i-1)` to `frame (i)` using the modified DH parameters, we apply the following 4 elementary operations:
 
-[](pic)  
+* *Rotation* of `alpha(i - 1)` about the `X axis`.
+* *Displacement* of `a(i - 1)` along the `X axis`.
 
-2. Make a python dictionary of known D-H parameters `s`.
+![Tx_sub][Tx_sub]
 
-3. Compose the homogeneous transform matrices using the D-H parameters for the calculating the transform from 0 to i(i = 1,2,3,4,5,6,G).
+	>	Represented by `Tx.subs({x_angle: alpha, x_d: a})`
 
-4. Correct the orientation of the gripper.
+* *Rotation* of `theta(i)` about the `Z axis`.
+* *Displacement* of `a(i)` along the `Z axis`.
 
-5. Now, what is left is to solve the inverse kinematics of the arm. For help in referred to the IK example.
+![Tz_sub][Tz_sub]
+
+	>	Represented by `Tz.subs({z_angle: q, z_d: a})`
+
+Thus, the application of the above operation gives the transformation matrix from `frame (i-1)` to `frame (i)`.
+
+```python
+Ti_minus_1_i = Tx.subs({x_angle: alpha, x_d: a}) * Tz.subs({z_angle: q, z_d: a})
+```
+
+![Ti_minus_1_i][Ti_minus_i]
+#### The transformation matrix from `frame (i-1)` to `frame (i)`
+
+By substituting the value of `alpha`, `a`, `d` and `q`, this transformation matrix will be used to find the individual transforms from :
+
+- `frame 0` to `frame` 1
+- `frame 1` to `frame` 2
+- `frame 2` to `frame` 3
+- `frame 3` to `frame` 4
+- `frame 4` to `frame` 5
+- `frame 5` to `frame` 6
+- `frame 6` to `gripper_frame` 
+
+Transformation matrix from frame 0 to gripper_frame(corrected) will be obtained by the multiplication above transformation matrices.
+
+### 4. Correct the Gripper orientation
+
+This is done by applying 2 elementary operations:
+1. Rotation by `pi radians` the about the `Z axis`
+
+```python 
+R_z = Tz.subs({z_angle: pi, z_d: 0})
+```
+
+2. Rotation by `-pi / 2` about the `Y axis`.
+
+```python
+R_y = Ty.subs({y_angle: -pi/2, y_d: 0})
+```
+
+Transformation matrix for correcting the gripper orientation wrt WC is:
+
+```python
+R_corr = R_z * R_y
+```
+
+### 5. Inverse Kinematics Solution
 
 #### This is divided into 2 parts: Inverse Position and Inverse Orientation
 
@@ -121,8 +220,13 @@ tan(theta6) = -R3_6[1,1] / R3_6[1,0]
 
 #### After finding out these angles, they were published to the RViz which moves the robotics arm KR210 also simulated in the Gazebo environment.
 
+### Results
+
+The inverse kinematics solution refers to finding the angles that the joints of the robotic arm need to be at so that the the end effector is at the desired position with the desired orientation. This can also be called the desired pose(position + orientation). This is a harder problem compared to forward kinematics (using joint angles to find the position and orientation of the end effector) and multiple solutions maybe present(in the dexterous workspace).
+
+The inverse kinematics solutions were calculated in approximately 1 second per solution for the points in the path planned by RViz. For real time applications, this should be in the order of milliseconds.
 #### Improvements
-This project can be improved by making a program that can produce closed-form inverse kinematics solutions automagically from the URDF file of the robot. Something like [ik_fast](http://openrave.org/docs/0.8.2/openravepy/ikfast/).
+This project can be improved by making a program that can produce closed-form inverse kinematics solutions automagically from the URDF file of the robot. Something like [ik_fast](http://openrave.org/docs/0.8.2/openravepy/ikfast/). Shifting to compiled languages will also reduce time to calculate the IK solutions.
 
 #### Where it might Fail
 This will fail to calculate solutions if the point to be reached is at a greater distance than the workspace of the robot, although in real cases extenders might be used at the cost of payload capacity. Mobile manipulators is also another option for pick and placement of far away objects.
@@ -138,3 +242,7 @@ This will fail to calculate solutions if the point to be reached is at a greater
 [IK_fig]: ./misc_images/EquationsPics/IK_calcFig.jpg
 [measure]: ./misc_images/EquationsPics/measurements.jpg
 [frame]: ./misc_images/EquationsPics/jointFrame.jpg
+[Txyz]: ./misc_images/EquationsPics/Txyz.png
+[Tx_sub]: ./misc_images/EquationsPics/TxSub.png
+[Tz_sub]: ./misc_images/EquationsPics/TzSub.png
+[Ti_minus_i]: ./misc_images/EquationsPics/Ti_minus_i.png
