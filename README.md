@@ -105,15 +105,36 @@ Ti_minus_1_i = Tx.subs({x_angle: alpha, x_d: a}) * Tz.subs({z_angle: q, z_d: a})
 
 By substituting the value of `alpha`, `a`, `d` and `q`, this transformation matrix will be used to find the individual transforms from :
 
-- `frame 0` to `frame` 1
-- `frame 1` to `frame` 2
-- `frame 2` to `frame` 3
-- `frame 3` to `frame` 4
-- `frame 4` to `frame` 5
-- `frame 5` to `frame` 6
-- `frame 6` to `gripper_frame` 
+> ![T0_1][T0_1]
+> - `frame 0` to `frame 1` _T0_1_
+
+> ![T1_2][T1_2]
+> - `frame 1` to `frame 2` _T1_2_
+
+> ![T2_3][T2_3]
+> - `frame 2` to `frame 3` _T2_3_
+
+> ![T3_4][T3_4]
+> - `frame 3` to `frame 4` _T3_4_
+
+> ![T4_5][T4_5]
+> - `frame 4` to `frame 5` _T4_5_
+
+> ![T5_6][T5_6]
+> - `frame 5` to `frame 6` _T5_6_
+
+> ![T6_G][T6_G]
+> - `frame 6` to `gripper_frame` _T6_G_ 
 
 Transformation matrix from frame 0 to gripper_frame(corrected) will be obtained by the multiplication above transformation matrices.
+
+Transformation matrix from `frame 0` to `frame 3` is `T0_3 = T0_1 * T1_2 * T2_3`.
+```python
+T0_3 = [-sin(q3)*sin(q2 - 0.5*pi)*cos(q1) + cos(q1)*cos(q3)*cos(q2 - 0.5*pi), -sin(q3)*cos(q1)*cos(q2 - 0.5*pi) - sin(q2 - 0.5*pi)*cos(q1)*cos(q3), -sin(q1), -1.6*sin(q1) + 1.25*cos(q1)*cos(q2 - 0.5*pi) + 0.35*cos(q1)],
+[-sin(q1)*sin(q3)*sin(q2 - 0.5*pi) + sin(q1)*cos(q3)*cos(q2 - 0.5*pi), -sin(q1)*sin(q3)*cos(q2 - 0.5*pi) - sin(q1)*sin(q2 - 0.5*pi)*cos(q3),  cos(q1),  1.25*sin(q1)*cos(q2 - 0.5*pi) + 0.35*sin(q1) + 1.6*cos(q1)],
+[                -sin(q3)*cos(q2 - 0.5*pi) - sin(q2 - 0.5*pi)*cos(q3),                  sin(q3)*sin(q2 - 0.5*pi) - cos(q3)*cos(q2 - 0.5*pi),        0,                                      -1.25*sin(q2 - 0.5*pi)],
+[                                                                   0,                                                                    0,        0,                                                           1]])
+```
 
 ### 4. Correct the Gripper orientation
 
@@ -246,3 +267,10 @@ This will fail to calculate solutions if the point to be reached is at a greater
 [Tx_sub]: ./misc_images/EquationsPics/TxSub.PNG
 [Tz_sub]: ./misc_images/EquationsPics/TzSub.PNG
 [Ti_minus_i]: ./misc_images/EquationsPics/Ti_minus_i.PNG
+[T0_1]: ./misc_images/EquationsPics/T0_1.PNG
+[T1_2]: ./misc_images/EquationsPics/T1_2.PNG
+[T2_3]: ./misc_images/EquationsPics/T2_3.PNG
+[T3_4]: ./misc_images/EquationsPics/T3_4.PNG
+[T4_5]: ./misc_images/EquationsPics/T4_5.PNG
+[T5_6]: ./misc_images/EquationsPics/T5_6.PNG
+[T6_G]: ./misc_images/EquationsPics/T6_G.PNG
