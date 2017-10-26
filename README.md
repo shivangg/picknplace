@@ -242,7 +242,7 @@ This will fail to calculate solutions if the point to be reached is at a greater
 [IK_fig]: ./misc_images/EquationsPics/IK_calcFig.jpg
 [measure]: ./misc_images/EquationsPics/measurements.jpg
 [frame]: ./misc_images/EquationsPics/jointFrame.jpg
-[Txyz]: ./misc_images/EquationsPics/Txyz.png
-[Tx_sub]: ./misc_images/EquationsPics/TxSub.png
-[Tz_sub]: ./misc_images/EquationsPics/TzSub.png
-[Ti_minus_i]: ./misc_images/EquationsPics/Ti_minus_i.png
+[Txyz]: ./misc_images/EquationsPics/Txyz.PNG
+[Tx_sub]: ./misc_images/EquationsPics/TxSub.PNG
+[Tz_sub]: ./misc_images/EquationsPics/TzSub.PNG
+[Ti_minus_i]: ./misc_images/EquationsPics/Ti_minus_i.PNG
