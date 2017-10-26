@@ -19,7 +19,6 @@ from geometry_msgs.msg import Pose
 from mpmath import *
 from sympy import *
 
-
 def handle_calculate_IK(req):
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
     if len(req.poses) < 1:
@@ -34,6 +33,10 @@ def handle_calculate_IK(req):
         q1, q2, q3, q4, q5, q6, q7                                        = symbols('q1:8')
 
         r, p, y                                                           = symbols('r p y')
+        a, d, q, alpha                                                    = symbols('a d q alpha')
+
+        x_angle, y_angle, z_angle                                         = symbols('x_angle y_angle z_angle')
+        x_d, y_d, z_d                                                     = symbols('x_d y_d z_d')
 
         # known DH parameters 
         s = {
@@ -46,56 +49,69 @@ def handle_calculate_IK(req):
                         alpha6: 0.       , a6: 0.     , d7: 0.303 , q7: 0.   
                 }
 
+        # Homogeneous Transformation matrices for elementary operations about the 3 orthogonal axes
+
+        Tx = Matrix([[      1,            0,                  0  ,    x_d  ],
+                      [     0,       cos(x_angle),  -sin(x_angle),    0    ],
+                      [     0,       sin(x_angle),   cos(x_angle),    0    ],
+                      [     0,            0,                    0,    1    ]                 
+            ])
+
+        Ty = Matrix([[ cos(y_angle)  ,        0,     sin(y_angle),     0    ],
+                      [             0,        1,                0,     y_d  ],
+                      [ -sin(y_angle),        0,     cos(y_angle),     0    ],
+                      [             0,        0,                0,     1    ]
+            ])
+
+        Tz = Matrix([[ cos(z_angle) ,        -sin(z_angle) ,     0,     0   ],
+                      [ sin(z_angle),         cos(z_angle) ,     0,     0   ],
+                      [            0,                    0 ,     1,     z_d ],
+                      [            0,                    0 ,     0,     1   ]
+            ])
+
         # Transformation from frame (i-1) to (i)
 
-        T0_1 = Matrix([[             cos(q1),            -sin(q1),            0,              a0],
-           [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0), -sin(alpha0)*d1],
-           [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0),  cos(alpha0)*d1],
-           [                   0,                   0,            0,               1]])
-        
+        # Using the modified DH parameters, the transformation matrix from frame (i-1) to i,
+        # given by the 4 elementary operations
+
+        # Rotation of alpha(i - 1) about the X axis.
+        # - Displacement of a(i - 1) along the X axis.
+        # (mathematically represented by Tx)
+        # - Rotation of theta(i) about the Z axis.
+        # - Displacement of a(i) along the Z axis.
+        # (mathematically represented by Tz)
+
+        # THerefore the transform is given by Tx * Tz
+
+        Ti_minus_1_i = Tx.subs({x_angle: alpha, x_d: a}) * Tz.subs({z_angle: q, z_d: a})
+
+
+        # Ti_minus_1_i = Matrix([[cos(q),            -sin(q),            0,              a],
+        #             [ sin(q)*cos(alpha), cos(q)*cos(alpha),  -sin(alpha), -sin(alpha)*d],
+        #             [ sin(q)*sin(alpha), cos(q)*sin(alpha),   cos(alpha),  cos(alpha)*d],
+        #             [                 0,                 0,            0,              1]])
+
+        T0_1 = Ti_minus_1_i.subs({q: q1, alpha: alpha0, a: a0, d: d1})
+
         # substituting in the values from the known DH parameter table
         T0_1 = T0_1.subs(s)
 
-        T1_2 = Matrix([[             cos(q2),            -sin(q2),            0,              a1],
-           [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1), -sin(alpha1)*d2],
-           [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1),  cos(alpha1)*d2],
-           [                   0,                   0,            0,               1]])
-        
+        T1_2 = Ti_minus_1_i.subs({q: q2, alpha: alpha1, a: a1, d: d2})
         T1_2 = T1_2.subs(s)
 
-        T2_3 = Matrix([[             cos(q3),            -sin(q3),            0,              a2],
-           [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2), -sin(alpha2)*d3],
-           [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2),  cos(alpha2)*d3],
-           [                   0,                   0,            0,               1]])
-        
+        T2_3 = Ti_minus_1_i.subs({q: q3, alpha: alpha2, a: a2, d: d3})
         T2_3 = T2_3.subs(s)
 
-        T3_4 = Matrix([[             cos(q4),            -sin(q4),            0,              a3],
-           [ sin(q4)*cos(alpha3), cos(q4)*cos(alpha3), -sin(alpha3), -sin(alpha3)*d4],
-           [ sin(q4)*sin(alpha3), cos(q4)*sin(alpha3),  cos(alpha3),  cos(alpha3)*d4],
-           [                   0,                   0,            0,               1]])
-        
+        T3_4 = Ti_minus_1_i.subs({q: q4, alpha: alpha3, a: a3, d: d4})
         T3_4 = T3_4.subs(s)
 
-        T4_5 = Matrix([[             cos(q5),            -sin(q5),            0,              a4],
-           [ sin(q5)*cos(alpha4), cos(q5)*cos(alpha4), -sin(alpha4), -sin(alpha4)*d5],
-           [ sin(q5)*sin(alpha4), cos(q5)*sin(alpha4),  cos(alpha4),  cos(alpha4)*d5],
-           [                   0,                   0,            0,               1]])
-        
+        T4_5 =  Ti_minus_1_i.subs({q: q5, alpha: alpha4, a: a4, d: d5})
         T4_5 = T4_5.subs(s)
 
-        T5_6 = Matrix([[             cos(q6),            -sin(q6),            0,              a5],
-           [ sin(q6)*cos(alpha5), cos(q6)*cos(alpha5), -sin(alpha5), -sin(alpha5)*d6],
-           [ sin(q6)*sin(alpha5), cos(q6)*sin(alpha5),  cos(alpha5),  cos(alpha5)*d6],
-           [                   0,                   0,            0,               1]])
-        
+        T5_6 = Ti_minus_1_i.subs({q: q6, alpha: alpha5, a: a5, d: d6}) 
         T5_6 = T5_6.subs(s)
 
-        T6_G = Matrix([[             cos(q7),            -sin(q7),            0,              a6],
-           [ sin(q7)*cos(alpha6), cos(q7)*cos(alpha6), -sin(alpha6), -sin(alpha6)*d7],
-           [ sin(q7)*sin(alpha6), cos(q7)*sin(alpha6),  cos(alpha6),  cos(alpha6)*d7],
-           [                   0,                   0,            0,               1]])
-        
+        T6_G = Ti_minus_1_i.subs({q: q7, alpha: alpha6, a: a6, d: d7})
         T6_G = T6_G.subs(s)
 
         # Homogenous transformation matrxi from base_frame to the gripper
@@ -103,20 +119,14 @@ def handle_calculate_IK(req):
         T0_3 = T0_1 * T1_2 * T2_3
         T0_G = T0_3 * T3_4 * T4_5 * T5_6 * T6_G 
 
-        # Correcting the orientaion of the gripper
+        ## Correcting the orientaion of the gripper
 
         # Rotation pi radians about Z - axis
-        R_z = Matrix([[             cos(pi),            -sin(pi),            0,              0],
-           [                        sin(pi),            cos(pi),             0,              0],
-           [                        0,                  0,                   1,              0],
-           [                        0,                  0,                   0,              1]])
-
+        R_z = Tz.subs({z_angle: pi, z_d: 0})
+        
         # Rotation -pi/2 radians about Y - axis
-        R_y = Matrix([[             cos(-pi/2),         0,                   sin(-pi/2),     0],
-           [                        0,                  1,                   0,              0],
-           [                        -sin(-pi/2),        0,                   cos(-pi/2),     0],
-           [                        0,                  0,                   0,              1]])
-
+        R_y = Ty.subs({y_angle: -pi/2, y_d: 0})
+        
         # Transformation matrix for correcting the gripper orientation wrt WC
         R_corr = R_z * R_y
 
@@ -125,20 +135,9 @@ def handle_calculate_IK(req):
         R0_3 = T0_3[0:3, 0:3]
 
         # Rotation matrix corresponding to roll, pitch and yaw
-        Rx = Matrix([[     1,            0,                  0   ],
-                      [ 0     ,     cos(r),              -sin(r) ],
-                      [ 0   ,       sin(r),              cos(r)  ]                 
-            ])
-
-        Ry = Matrix([[ cos(p),                0,          sin(p)  ],
-                      [     0,                1,               0  ],
-                      [ -sin(p),              0,          cos(p)  ]
-            ])
-
-        Rz = Matrix([[ cos(y) ,         -sin(y),     0 ],
-                      [ sin(y),         cos(y)  ,    0 ],
-                      [      0,               0 ,    1 ]
-            ])
+        Rx = Tx.subs({x_angle: r})[0:3, 0:3]
+        Ry = Ty.subs({y_angle: p})[0:3, 0:3]
+        Rz = Tz.subs({z_angle: y})[0:3, 0:3]
 
         # Rotation matrix to transform to given roll, pitch and yaw with the  correct gripper orientation
         
