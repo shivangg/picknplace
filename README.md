@@ -1,5 +1,9 @@
 ## Project: Kinematics Pick & Place
 
+### Working GIF
+
+![Working GIF](./pickNplace.gif)
+
 ### 1. Kinematics Analysis
 
 Here is the [YouTube video](https://youtu.be/yYx3GbzMq0A) showing the pick and plcace operation using the *KR210 robotic arm*
